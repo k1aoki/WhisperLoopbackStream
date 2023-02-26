@@ -20,9 +20,15 @@ namespace WhisperLoopbackStream
     /// </summary>
     public partial class MainWindow : Window
     {
+        private TranscriptStorage storage = new TranscriptStorage();
+
         public MainWindow()
         {
             InitializeComponent();
+            DataContext = storage;
+            BindingOperations.EnableCollectionSynchronization(storage.TranscriptList, new object());
+
+            var task = WhisperStream.RunDetection(storage);
         }
     }
 }

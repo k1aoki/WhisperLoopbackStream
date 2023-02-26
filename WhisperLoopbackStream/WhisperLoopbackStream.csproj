@@ -5,6 +5,13 @@
     <TargetFramework>net7.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
+    <AssemblyName>$(MSBuildProjectName)_c.kaname</AssemblyName>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.1.0" />
+    <PackageReference Include="RingBuffer" Version="1.5.1" />
+    <PackageReference Include="Whisper.net" Version="1.2.1" />
+  </ItemGroup>
 
 </Project>
