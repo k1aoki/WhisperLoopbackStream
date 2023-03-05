@@ -24,7 +24,9 @@ namespace WhisperLoopbackStream
                 await modelStream.CopyToAsync(fileWriter);
             }
 
-            await StreamDetection(storage, modelName);
+            //await StreamDetection(storage, modelName);
+            await StreamDetectionFromFile(storage, "sample.wav", modelName);
+            //await FullDetection(storage, "sample.wav", modelName);
         }
 
         private static async Task FullDetection(TranscriptStorage storage, string fileName, string modelName)
@@ -49,6 +51,60 @@ namespace WhisperLoopbackStream
                 Console.WriteLine(msg);
                 storage.TranscriptList.Add(new Transcript() { SegmentStart = segment.Start, SegmentEnd = segment.End, Text = segment.Text });
             }
+        }
+
+        private static Task StreamDetectionFromFile(TranscriptStorage storage, string fileName, string modelName)
+        {
+            return Task.Run(() =>
+            {
+                var fileStream = File.OpenRead(fileName);
+                var wavParser = new WaveParser(fileStream);
+
+                var sampleCount = wavParser.GetSamplesCount();
+
+                void OnNewSegment(SegmentData segment)
+                {
+                    Debug.WriteLine($"CSSS {segment.Start} ==> {segment.End} : {segment.Text}");
+                    storage.TranscriptList.Add(new Transcript() { SegmentStart = segment.Start, SegmentEnd = segment.End, Text = segment.Text });
+
+                }
+                using var factory = WhisperFactory.FromPath(modelName);
+                var builder = factory.CreateBuilder()
+                    .WithLanguage("auto")
+                    .WithSegmentEventHandler(OnNewSegment);
+                using var processor = builder.Build();
+
+
+                var waveOut = new WaveOut();
+                var bufferedwaveprovider = new BufferedWaveProvider(new WaveFormat(16000, 1));
+                bufferedwaveprovider.DiscardOnBufferOverflow = true;
+                waveOut.Init(bufferedwaveprovider);
+
+                while (sampleCount > 0)
+                {
+                    var numSampleInChunk = Math.Min(sampleCount, 16 * 1024 * 5);
+                    float[] samples = new float[numSampleInChunk];
+
+                    for (var i = 0; i <  numSampleInChunk; i++)
+                    {
+                        long rawsample = new long();
+                        samples[i] = wavParser.GetAvgSample(ref rawsample);
+
+
+                        bufferedwaveprovider.AddSamples(BitConverter.GetBytes(rawsample), 0, 2);
+                    }
+
+                    Debug.WriteLine($"Start process with {numSampleInChunk} samples");
+                    //await foreach (var segment in processor.ProcessAsync(samples, CancellationToken.None))
+                    //{
+                    //    Debug.WriteLine($"CSSS {segment.Start} ==> {segment.End} : {segment.Text}");
+                    //    storage.TranscriptList.Add(new Transcript() { SegmentStart = segment.Start, SegmentEnd = segment.End, Text = segment.Text });
+                    //}
+                    processor.Process(samples);
+                    sampleCount -= numSampleInChunk;
+                }
+            }
+            );
         }
 
         private static Task StreamDetection(TranscriptStorage storage, string modelName)
